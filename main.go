@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const (
@@ -55,6 +56,23 @@ func worker(id int, jobs <-chan int, results chan<- int, wg *sync.WaitGroup, pro
 	}
 }
 
+// reportProgress periodically logs the progress of the prime finding operation
+func reportProgress(ctx context.Context, processed *atomic.Int64, total int) {
+	ticker := time.NewTicker(progressInterval * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			current := processed.Load()
+			percentage := float64(current) / float64(total) * 100
+			fmt.Printf("Progress: %.2f%% (%d/%d)\r", percentage, current, total)
+		}
+	}
+}
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -76,6 +94,8 @@ func main() {
 
 	// Create atomic counter for progress tracking
 	processed := &atomic.Int64{}
+
+	go reportProgress(ctx, processed, total)
 
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
