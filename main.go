@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"sync"
 	"sync/atomic"
 )
@@ -56,6 +58,15 @@ func worker(id int, jobs <-chan int, results chan<- int, wg *sync.WaitGroup, pro
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Set up signal handling for graceful shutdown
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	go func() {
+		<-sigCh
+		fmt.Println("\nCancellation requested. Shutting down...")
+		cancel()
+	}()
 
 	total := maxNum - minNum + 1
 
